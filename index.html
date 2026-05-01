@@ -759,8 +759,63 @@ function uploadAllData() {
     }; 
     window.firebaseModules.update(window.firebaseModules.ref(firebaseDb), updates).catch(e=>{}); 
 }
-function listenToChanges() { if (!syncEnabled || !firebaseDb) return; const dataRef = window.firebaseModules.ref(firebaseDb); window.firebaseModules.onValue(dataRef, (snapshot) => { const data = snapshot.val(); if (!data) return; let changed = false; if (data.recipes && JSON.stringify(data.recipes) !== JSON.stringify(recipes)) { recipes = data.recipes; changed = true; } if (data.recipeFavorites && JSON.stringify(data.recipeFavorites) !== JSON.stringify(recipeFavorites)) { recipeFavorites = data.recipeFavorites; changed = true; } if (changed) { save(); renderTabs(); if (document.getElementById("recipes").classList.contains("active")) renderRecipes(); } }); }
-function manualSync() { if (syncEnabled) { uploadAllData(); alert("✅ Sincronizado!"); } else alert("Configure o Firebase primeiro!"); }
+function listenToChanges() { 
+    if (!syncEnabled || !firebaseDb) return; 
+    const dataRef = window.firebaseModules.ref(firebaseDb); 
+    window.firebaseModules.onValue(dataRef, (snapshot) => { 
+        const data = snapshot.val(); 
+        if (!data) return; 
+        let changed = false; 
+        
+        // Verifica TODOS os dados, não só recipes
+        if (data.recipes && JSON.stringify(data.recipes) !== JSON.stringify(recipes)) { 
+            recipes = data.recipes; 
+            changed = true; 
+        }
+        if (data.plan && JSON.stringify(data.plan) !== JSON.stringify(plan)) { 
+            plan = data.plan; 
+            changed = true; 
+        }
+        if (data.stock && JSON.stringify(data.stock) !== JSON.stringify(stock)) { 
+            stock = data.stock; 
+            changed = true; 
+        }
+        if (data.notes && JSON.stringify(data.notes) !== JSON.stringify(notes)) { 
+            notes = data.notes; 
+            changed = true; 
+        }
+        if (data.recipeComments && JSON.stringify(data.recipeComments) !== JSON.stringify(recipeComments)) { 
+            recipeComments = data.recipeComments; 
+            changed = true; 
+        }
+        if (data.extraItems && JSON.stringify(data.extraItems) !== JSON.stringify(extraItems)) { 
+            extraItems = data.extraItems; 
+            changed = true; 
+        }
+        if (data.favorites && JSON.stringify(data.favorites) !== JSON.stringify(favorites)) { 
+            favorites = data.favorites; 
+            changed = true; 
+        }
+        if (data.recipeFavorites && JSON.stringify(data.recipeFavorites) !== JSON.stringify(recipeFavorites)) { 
+            recipeFavorites = data.recipeFavorites; 
+            changed = true; 
+        }
+        
+        if (changed) { 
+            save(); 
+            renderTabs(); 
+            // Recarrega a aba ativa
+            const activeTab = document.querySelector(".container.active");
+            if (activeTab) {
+                if (activeTab.id === "recipes") renderRecipes();
+                else if (activeTab.id === "notes") renderNotes();
+                else if (activeTab.id === "shopping") { generateList(); renderExtraItems(); }
+                else if (activeTab.id === "stockTab") { initStockFilters(); applyStockFilters(); }
+                else if (activeTab.id === "planner") renderPlanner();
+            }
+        } 
+    }); 
+}function manualSync() { if (syncEnabled) { uploadAllData(); alert("✅ Sincronizado!"); } else alert("Configure o Firebase primeiro!"); }
 
 // ============ RECEITAS ============
 function toggleRecipeFavorite(name, event) { event.stopPropagation(); recipeFavorites[name] = !recipeFavorites[name]; save(); renderRecipes(); }
