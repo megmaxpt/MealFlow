@@ -741,7 +741,24 @@ function sanitizeObject(obj) { if (Array.isArray(obj)) return obj.map(item => sa
 function setupFirebase() { const url = document.getElementById("firebaseUrl").value.trim(); const key = document.getElementById("firebaseKey").value.trim(); if (!url || !key) { alert("Insira URL e API Key!"); return; } try { if (!firebaseApp) { const config = { apiKey: key, databaseURL: url, projectId: "appmeal-alpha" }; firebaseApp = window.firebaseModules.initializeApp(config); } firebaseDb = window.firebaseModules.getDatabase(firebaseApp); syncEnabled = true; document.getElementById("syncText").textContent = "Online ☁️"; document.getElementById("syncStatus").classList.remove("offline"); loadFromCloud(); localStorage.setItem("firebaseConfig", JSON.stringify({ url, key })); alert("✅ Conectado!"); } catch (e) { alert("❌ Erro: " + e.message); } }
 function loadFromCloud() { if (!syncEnabled || !firebaseDb) return; const dataRef = window.firebaseModules.ref(firebaseDb); window.firebaseModules.get(dataRef).then((snapshot) => { if (snapshot.exists()) { const data = snapshot.val(); if (data.recipes) recipes = data.recipes; if (data.plan) plan = data.plan; if (data.stock) stock = data.stock; if (data.favorites) favorites = data.favorites; if (data.recipeFavorites) recipeFavorites = data.recipeFavorites; if (data.itemPrices) itemPrices = data.itemPrices; if (data.storeSections) storeSections = data.storeSections; if (data.categoryOrder) categoryOrder = data.categoryOrder; if (data.tabOrder) tabOrder = data.tabOrder; if (data.notes) notes = data.notes; if (data.recipeComments) recipeComments = data.recipeComments; if (data.extraItems) extraItems = data.extraItems; save(); renderTabs(); if (document.getElementById("recipes").classList.contains("active")) renderRecipes(); if (document.getElementById("stockTab").classList.contains("active")) { initStockFilters(); applyStockFilters(); } if (document.getElementById("shopping").classList.contains("active")) { generateList(); renderExtraItems(); } if (document.getElementById("planner").classList.contains("active")) renderPlanner(); if (document.getElementById("notes").classList.contains("active")) renderNotes(); } else { uploadAllData(); } listenToChanges(); }); }
 function disconnectFirebase() { syncEnabled = false; document.getElementById("syncText").textContent = "Offline"; document.getElementById("syncStatus").classList.add("offline"); }
-function uploadAllData() { if (!syncEnabled || !firebaseDb) return; const updates = { '/recipes': sanitizeObject(recipes), '/plan': sanitizeObject(plan), '/stock': sanitizeObject(stock), '/favorites': sanitizeObject(favorites), '/recipeFavorites': sanitizeObject(recipeFavorites) }; window.firebaseModules.update(window.firebaseModules.ref(firebaseDb), updates).catch(e=>{}); }
+function uploadAllData() { 
+    if (!syncEnabled || !firebaseDb) return; 
+    const updates = { 
+        '/recipes': sanitizeObject(recipes), 
+        '/plan': sanitizeObject(plan), 
+        '/stock': sanitizeObject(stock), 
+        '/favorites': sanitizeObject(favorites), 
+        '/recipeFavorites': sanitizeObject(recipeFavorites),
+        '/itemPrices': sanitizeObject(itemPrices),
+        '/storeSections': sanitizeObject(storeSections),
+        '/categoryOrder': sanitizeObject(categoryOrder),
+        '/tabOrder': sanitizeObject(tabOrder),
+        '/notes': sanitizeObject(notes),
+        '/recipeComments': sanitizeObject(recipeComments),
+        '/extraItems': sanitizeObject(extraItems)
+    }; 
+    window.firebaseModules.update(window.firebaseModules.ref(firebaseDb), updates).catch(e=>{}); 
+}
 function listenToChanges() { if (!syncEnabled || !firebaseDb) return; const dataRef = window.firebaseModules.ref(firebaseDb); window.firebaseModules.onValue(dataRef, (snapshot) => { const data = snapshot.val(); if (!data) return; let changed = false; if (data.recipes && JSON.stringify(data.recipes) !== JSON.stringify(recipes)) { recipes = data.recipes; changed = true; } if (data.recipeFavorites && JSON.stringify(data.recipeFavorites) !== JSON.stringify(recipeFavorites)) { recipeFavorites = data.recipeFavorites; changed = true; } if (changed) { save(); renderTabs(); if (document.getElementById("recipes").classList.contains("active")) renderRecipes(); } }); }
 function manualSync() { if (syncEnabled) { uploadAllData(); alert("✅ Sincronizado!"); } else alert("Configure o Firebase primeiro!"); }
 
