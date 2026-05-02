@@ -422,7 +422,30 @@ function extractIngredientName(i) {
     return name.trim()||i;
 }
 function extractQuantityWithUnit(i){if(/q\.?\s*b\.?\s*\.?|quanto\s+baste|qb/i.test(i))return{value:0,unit:'q.b.',text:"q.b.",type:'qb'};let m=i.match(/(\d+[.,]?\d*)\s*([a-zA-ZÀ-ÿ]+)?/i);if(m)return{value:parseFloat(m[1].replace(',','.')),unit:m[2]||null,type:'quantity'};return{value:1,unit:'un',type:'count'};}
-function categorizeFood(i){let n=i.toLowerCase();if(n.includes('frango')||n.includes('carne')||n.includes('porco')||n.includes('vaca'))return'🥩 Carnes';if(n.includes('bacalhau')||n.includes('peixe')||n.includes('atum')||n.includes('salmão'))return'🐟 Peixes e Marisco';if(n.includes('batata')||n.includes('cebola')||n.includes('tomate')||n.includes('cenoura'))return'🥦 Legumes e Vegetais';if(n.includes('maçã')||n.includes('banana')||n.includes('laranja')||n.includes('limão'))return'🍎 Frutas';if(n.includes('leite')||n.includes('queijo')||n.includes('iogurte')||n.includes('ovo'))return'🥛 Laticínios e Ovos';if(n.includes('arroz')||n.includes('massa')||n.includes('farinha')||n.includes('pão'))return'🍚 Grãos e Massas';if(n.includes('sal')||n.includes('azeite')||n.includes('vinagre')||n.includes('óleo'))return'🧂 Temperos e Ervas';if(n.includes('chocolate')||n.includes('bolo')||n.includes('açúcar'))return'🍰 Sobremesas';if(n.includes('detergente')||n.includes('lixívia'))return'🧹 Limpeza';if(n.includes('shampoo')||n.includes('sabonete'))return'🧴 Higiene';return'🧂 Mercearia';}
+function categorizeFood(i, manualCat=''){
+    // Se tem categoria manual, usa essa (SOBREPÕE a automática)
+    if(manualCat && allCategories.includes(manualCat)) return manualCat;
+    
+    let n = i.toLowerCase();
+    if(n.includes('frango')||n.includes('carne')||n.includes('porco')||n.includes('vaca'))return'🥩 Carnes';
+    if(n.includes('bacalhau')||n.includes('peixe')||n.includes('atum')||n.includes('salmão')||n.includes('camarão'))return'🐟 Peixes e Marisco';
+    if(n.includes('batata')||n.includes('cebola')||n.includes('tomate')||n.includes('cenoura'))return'🥦 Legumes e Vegetais';
+    if(n.includes('maçã')||n.includes('banana')||n.includes('laranja')||n.includes('limão'))return'🍎 Frutas';
+    if(n.includes('leite')||n.includes('queijo')||n.includes('iogurte')||n.includes('ovo'))return'🥛 Laticínios e Ovos';
+    if(n.includes('arroz')||n.includes('massa')||n.includes('farinha')||n.includes('pão'))return'🍚 Grãos e Massas';
+    if(n.includes('sal')||n.includes('azeite')||n.includes('vinagre')||n.includes('óleo'))return'🧂 Temperos e Ervas';
+    // CORREÇÃO: Cogumelos, enlatados, conservas
+    if(n.includes('cogumelo')||n.includes('enlatado')||n.includes('lata')||n.includes('conserva'))return'🥫 Enlatados e Conservas';
+    if(n.includes('atum')||n.includes('salsicha')||n.includes('milho')||n.includes('ervilha'))return'🥫 Enlatados e Conservas';
+    if(n.includes('chocolate')||n.includes('bolo')||n.includes('açúcar')||n.includes('sobremesa'))return'🍰 Sobremesas';
+    // CORREÇÃO: Detergentes, limpeza - mais palavras-chave
+    if(n.includes('detergente')||n.includes('lixívia')||n.includes('esfregão')||n.includes('limpa')||n.includes('chão')||n.includes('mosaico')||n.includes('madeira'))return'🧹 Limpeza';
+    if(n.includes('shampoo')||n.includes('sabonete')||n.includes('papel')||n.includes('higiénico'))return'🧴 Higiene';
+    if(n.includes('vinho')||n.includes('cerveja')||n.includes('água')||n.includes('sumo'))return'🍷 Bebidas';
+    if(n.includes('pão'))return'🍚 Grãos e Massas';
+    if(n.includes('manteiga'))return'🥛 Laticínios e Ovos';
+    return'🧂 Mercearia';
+}
 function formatQuantity(v,u){if(!u)return v.toString();if(u==='q.b.')return'q.b.';return`${Math.ceil(v)} ${u}`;}
 function getBadgeClass(t){const c={'Prato Principal':'badge-primary','Sopa':'badge-sopa','Entrada':'badge-entrada','Sobremesa':'badge-sobremesa','Saudável':'badge-saudavel'};return c[t]||'badge-primary';}
 function getCategoryOrder(){let all=new Set(categoryOrder);Object.keys(stock).forEach(i=>all.add(categorizeFood(i)));Object.values(recipes).forEach(r=>{if(r.ing)r.ing.forEach(i=>{let n=extractIngredientName(i);if(n)all.add(categorizeFood(n));});});return categoryOrder.filter(c=>all.has(c));}
