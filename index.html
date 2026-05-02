@@ -206,6 +206,7 @@ h3{color: var(--text-primary);font-weight:600;margin-bottom:20px;}
 .sync-item-dest button.inactive{opacity:0.4;}
 .remove-btn{background:none!important;border:none!important;color:var(--danger)!important;cursor:pointer;padding:4px 8px!important;font-size:16px;box-shadow:none!important;}
 .remove-btn:hover{opacity:0.7;transform:scale(1.2);}
+.receipt-photo-container{position:relative;background:#000;border-radius:14px;overflow:hidden;margin-bottom:10px;min-height:150px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 
 @media print{*{margin:0;padding:0}body{background:white}#top,button,.btn-group,.stock-controls,.tab,.filter-section,.install-banner{display:none!important}.container{display:block!important;padding:0!important}}
 @media (max-width:768px){.filters-row{grid-template-columns:1fr}#plannerBox{grid-template-columns:1fr}.modal-content{max-width:95%;margin:10px;}.calendar-view{grid-template-columns:repeat(7,1fr);font-size:9px;}.sync-item-row{font-size:12px;}}
@@ -241,6 +242,51 @@ h3{color: var(--text-primary);font-weight:600;margin-bottom:20px;}
 </div>
 <input type="hidden" id="editExtraIndex">
 <div style="display:flex;gap:10px;margin-top:15px;"><button onclick="saveEditedExtraItem()" class="btn btn-success" style="flex:1;">💾 Guardar</button><button onclick="closeEditExtraItemModal()" class="btn btn-outline">❌ Cancelar</button></div></div></div>
+
+<!-- Scanner Modal -->
+<div id="scannerModal" class="sync-modal" style="display:none;" onclick="closeScannerModal(event)"><div class="sync-modal-content" onclick="event.stopPropagation()" style="max-width:800px;padding:20px;">
+    <h3 style="margin:0 0 10px 0;">📸 Scanner de Compras</h3>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">Fotografe o talão como referência e selecione os itens que comprou.</p>
+    
+    <div class="receipt-photo-container" id="receiptPhotoContainer" onclick="toggleReceiptZoom()">
+        <div id="receiptPlaceholder" style="color:#fff;text-align:center;padding:40px;cursor:pointer;" onclick="event.stopPropagation();document.getElementById('receiptInput').click();">
+            <div style="font-size:48px;">📸</div><p>Tocar para fotografar o talão</p>
+        </div>
+        <input type="file" id="receiptInput" accept="image/*" capture="environment" style="display:none;" onchange="showReceiptPhoto(event)">
+        <img id="receiptPreview" style="display:none;width:100%;height:auto;max-height:40vh;object-fit:contain;transition:transform 0.3s;" onclick="event.stopPropagation();">
+    </div>
+    
+    <div style="display:flex;gap:8px;margin:10px 0;">
+        <button onclick="document.getElementById('receiptInput').click()" class="btn-small btn-info">📸 Nova Foto</button>
+        <button onclick="clearReceiptPhoto()" class="btn-small btn-warning">🗑️ Limpar</button>
+        <button onclick="zoomReceiptIn()" class="btn-small btn-purple">🔍+</button>
+        <button onclick="zoomReceiptOut()" class="btn-small btn-purple">🔍-</button>
+        <button onclick="resetReceiptZoom()" class="btn-small btn-info">↺ Reset</button>
+    </div>
+    
+    <div style="max-height:25vh;overflow-y:auto;margin-bottom:10px;">
+        <h4 style="margin:0 0 8px 0;">📋 Itens da Lista de Compras</h4>
+        <div id="scannerItemsList"></div>
+    </div>
+    
+    <div style="border-top:1px solid var(--border-color);padding-top:10px;margin-bottom:10px;">
+        <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:3;min-width:100px;"><input type="text" id="scannerExtraName" placeholder="Item extra"></div>
+            <div style="flex:1;min-width:60px;"><input type="text" id="scannerExtraQty" placeholder="Qtd"></div>
+            <div style="flex:1;min-width:60px;"><input type="number" id="scannerExtraPrice" placeholder="€" step="0.01"></div>
+            <button onclick="addScannerExtraItem()" class="btn-purple" style="height:42px;">➕</button>
+        </div>
+    </div>
+    
+    <div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;">
+        <div style="display:flex;gap:5px;">
+            <button onclick="selectAllScannerItems()" class="btn-small btn-info">☑️ Todos</button>
+            <button onclick="deselectAllScannerItems()" class="btn-small btn-warning">☐ Nenhum</button>
+        </div>
+        <button onclick="confirmReceiptItems()" class="btn btn-success">📦 Adicionar à Despensa</button>
+        <button onclick="closeScannerModal()" class="btn btn-outline">❌ Cancelar</button>
+    </div>
+</div></div>
 
 <div id="recipes" class="container active">
 <div class="recipes-header"><h2 style="margin:0;">📚 As Minhas Receitas</h2><div class="recipes-stats"><div class="stat-badge">📋 Total: <span id="totalRecipes">0</span></div><div class="stat-badge">🍽️ Pratos: <span id="mainDishes">0</span></div><div class="stat-badge">🥗 Saudáveis: <span id="healthyRecipes">0</span></div><div class="stat-badge">⭐ Favoritos: <span id="favRecipes">0</span></div></div></div>
@@ -315,7 +361,7 @@ h3{color: var(--text-primary);font-weight:600;margin-bottom:20px;}
 <div class="stats-section"><div class="stat-card"><h4>📦 Total</h4><div class="stat-value" id="stockTotalItems">0</div></div><div class="stat-card"><h4>🔴 Esgotados</h4><div class="stat-value" id="stockZeroItems">0</div></div><div class="stat-card"><h4>🟡 Pouco</h4><div class="stat-value" id="stockLowItems">0</div></div></div>
 <div class="filters-row"><div class="filter-box"><h4>🔍 Filtros</h4><div class="filter-row"><label>🔎 Pesquisar:</label><input type="text" id="stockSearch" placeholder="Nome..." oninput="applyStockFilters()"></div><div class="filter-row"><label>📂 Categoria:</label><select id="stockCategoryFilter" onchange="applyStockFilters()"><option value="">Todas</option></select></div><div class="filter-row"><label>📊 Quantidade:</label><select id="stockQuantityFilter" onchange="applyStockFilters()"><option value="all">Todos</option><option value="zero">🔴 Esgotados</option><option value="low">🟡 Pouco</option><option value="medium">🟢 Médio</option><option value="high">🔵 Muito</option><option value="gt0">✅ Com stock</option></select></div><div class="filter-row"><label><input type="checkbox" id="hideZeroStock" onchange="applyStockFilters()"> Ocultar esgotados</label></div><div class="filter-row"><label><input type="checkbox" id="showFavoritesOnly" onchange="applyStockFilters()"> ⭐ Favoritos</label></div></div><div class="filter-box"><h4>🍽️ Filtrar por Refeição</h4><div class="filter-row"><label>📅 Dia:</label><select id="stockDayFilter" onchange="updateStockMealFilter()"><option value="">Selecione</option></select></div><div class="filter-row"><label>🍽️ Refeição:</label><select id="stockMealFilter" onchange="applyStockFilters()"><option value="">Selecione</option></select></div><div class="filter-row"><button onclick="clearStockMealFilter()" class="btn-warning btn-small">🗑️ Limpar</button></div><div id="stockMealInfo" style="margin-top:10px;padding:8px;background:#fff3e0;border-radius:5px;display:none;"></div></div></div>
 <div class="filter-row" style="margin-bottom:15px;"><button onclick="clearAllStockFilters()" class="btn-warning">🗑️ Limpar Todos os Filtros</button></div>
-<div class="stock-controls"><button onclick="addStockItem()" class="btn-success">➕ Adicionar</button><button onclick="showSyncIngredientsModal()" class="btn-info">🔄 Sincronizar Planeador</button><button onclick="consolidateStock()" class="btn-purple">🔧 Consolidar</button><button onclick="clearAllStock()" class="btn-danger">🗑️ Limpar Despensa</button></div>
+<div class="stock-controls"><button onclick="addStockItem()" class="btn-success">➕ Adicionar</button><button onclick="showSyncIngredientsModal()" class="btn-info">🔄 Sincronizar Planeador</button><button onclick="openScanner()" class="btn-info">📸 Scanner de Talões</button><button onclick="consolidateStock()" class="btn-purple">🔧 Consolidar</button><button onclick="clearAllStock()" class="btn-danger">🗑️ Limpar Despensa</button></div>
 <div id="stockBox"></div>
 </div>
 
@@ -355,6 +401,8 @@ let recipeComments = JSON.parse(localStorage.getItem("recipeComments")) || {};
 let extraItems = JSON.parse(localStorage.getItem("extraItems")) || [];
 let recipeHealthy = JSON.parse(localStorage.getItem("recipeHealthy")) || {};
 let pendingSyncItems = [];
+let pendingReceiptItems = [];
+let receiptZoomLevel = 1;
 
 const allCategories = ["🥩 Carnes","🐟 Peixes e Marisco","🥦 Legumes e Vegetais","🍎 Frutas","🥛 Laticínios e Ovos","🍚 Grãos e Massas","🧂 Temperos e Ervas","🥫 Enlatados e Conservas","🍷 Bebidas","🍰 Sobremesas","🧹 Limpeza","🧴 Higiene","📦 Outros","🧂 Mercearia"];
 const defaultCategoryOrder = [...allCategories];
@@ -603,6 +651,149 @@ function confirmSyncIngredients() {
 }
 function closeSyncIngredientsModal(event) { if (!event || event.target === document.getElementById("syncIngredientsModal")) { document.getElementById("syncIngredientsModal").style.display = "none"; pendingSyncItems = []; } }
 
+// ============ SCANNER DE COMPRAS ============
+function openScanner(){
+    document.getElementById("receiptPreview").style.display = "none";
+    document.getElementById("receiptPlaceholder").style.display = "block";
+    document.getElementById("receiptInput").value = "";
+    document.getElementById("scannerExtraName").value = "";
+    document.getElementById("scannerExtraQty").value = "";
+    document.getElementById("scannerExtraPrice").value = "";
+    pendingReceiptItems = [];
+    receiptZoomLevel = 1;
+    resetReceiptZoom();
+    
+    const itemsFromList = extraItems
+        .filter(item => !item.checked)
+        .map(item => ({
+            name: item.name,
+            qty: item.qty,
+            price: itemPrices[item.name] || 0,
+            selected: true,
+            fromList: true,
+            extraIndex: extraItems.indexOf(item)
+        }));
+    
+    pendingReceiptItems = itemsFromList;
+    renderScannerItems();
+    document.getElementById("scannerModal").style.display = "flex";
+}
+
+function closeScannerModal(e){
+    if(!e || e.target === document.getElementById("scannerModal")){
+        document.getElementById("scannerModal").style.display = "none";
+        resetReceiptZoom();
+    }
+}
+
+function showReceiptPhoto(event){
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){
+        document.getElementById("receiptPreview").src = e.target.result;
+        document.getElementById("receiptPreview").style.display = "block";
+        document.getElementById("receiptPlaceholder").style.display = "none";
+        resetReceiptZoom();
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearReceiptPhoto(){
+    document.getElementById("receiptPreview").style.display = "none";
+    document.getElementById("receiptPlaceholder").style.display = "block";
+    document.getElementById("receiptInput").value = "";
+    resetReceiptZoom();
+}
+
+function toggleReceiptZoom(){
+    receiptZoomLevel >= 3 ? resetReceiptZoom() : (receiptZoomLevel += 0.5, applyReceiptZoom());
+}
+
+function zoomReceiptIn(){
+    if(receiptZoomLevel < 5){ receiptZoomLevel += 0.5; applyReceiptZoom(); }
+}
+
+function zoomReceiptOut(){
+    if(receiptZoomLevel > 0.5){ receiptZoomLevel -= 0.5; applyReceiptZoom(); }
+}
+
+function resetReceiptZoom(){
+    receiptZoomLevel = 1;
+    applyReceiptZoom();
+    document.getElementById("receiptPhotoContainer").style.overflow = "hidden";
+    document.getElementById("receiptPhotoContainer").style.cursor = "pointer";
+}
+
+function applyReceiptZoom(){
+    const img = document.getElementById("receiptPreview");
+    if(img.style.display !== "none"){
+        img.style.transform = `scale(${receiptZoomLevel})`;
+        img.style.transformOrigin = "top left";
+        document.getElementById("receiptPhotoContainer").style.overflow = receiptZoomLevel > 1 ? "auto" : "hidden";
+        document.getElementById("receiptPhotoContainer").style.cursor = receiptZoomLevel > 1 ? "zoom-out" : "zoom-in";
+    }
+}
+
+function addScannerExtraItem(){
+    const name = document.getElementById("scannerExtraName").value.trim();
+    const qty = document.getElementById("scannerExtraQty").value.trim() || "1 un";
+    const price = parseFloat(document.getElementById("scannerExtraPrice").value) || 0;
+    if(!name){ alert("Escreva o nome do item!"); return; }
+    pendingReceiptItems.push({ name, qty, price, selected: true, fromList: false, extraIndex: -1 });
+    document.getElementById("scannerExtraName").value = "";
+    document.getElementById("scannerExtraQty").value = "";
+    document.getElementById("scannerExtraPrice").value = "";
+    renderScannerItems();
+}
+
+function renderScannerItems(){
+    const container = document.getElementById("scannerItemsList");
+    if(pendingReceiptItems.length === 0){
+        container.innerHTML = '<p style="text-align:center;padding:15px;color:var(--text-secondary);">📋 Nenhum item na lista de compras.<br>Adicione itens extra ou vá à aba 🧾 Lista.</p>';
+        return;
+    }
+    let html = '';
+    pendingReceiptItems.forEach((item, index) => {
+        html += `<div class="sync-item-row" style="${item.fromList ? 'background:var(--filter-bg);' : 'background:#fff8e1;'}">
+            <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="pendingReceiptItems[${index}].selected = this.checked" style="width:16px;height:16px;">
+            <input type="text" value="${item.name}" onchange="pendingReceiptItems[${index}].name = this.value" style="flex:2;font-size:12px;">
+            <input type="text" value="${item.qty}" onchange="pendingReceiptItems[${index}].qty = this.value" style="width:80px;font-size:12px;">
+            <input type="number" value="${item.price}" step="0.01" onchange="pendingReceiptItems[${index}].price = parseFloat(this.value) || 0" style="width:70px;font-size:12px;">
+            <button onclick="pendingReceiptItems.splice(${index},1);renderScannerItems();" class="remove-btn">×</button>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+function selectAllScannerItems(){ pendingReceiptItems.forEach(i => i.selected = true); renderScannerItems(); }
+function deselectAllScannerItems(){ pendingReceiptItems.forEach(i => i.selected = false); renderScannerItems(); }
+
+function confirmReceiptItems(){
+    const selected = pendingReceiptItems.filter(i => i.selected);
+    if(selected.length === 0){ alert("⚠️ Selecione pelo menos um item!"); return; }
+    let addedCount = 0, markedCount = 0;
+    selected.forEach(item => {
+        const key = `${item.name} (${item.qty})`;
+        const ek = Object.keys(stock).find(k => k.toLowerCase().includes(item.name.toLowerCase()));
+        if(ek){ stock[ek] = (stock[ek] || 0) + 1; } else { stock[key] = 1; }
+        if(item.price > 0) itemPrices[key] = item.price;
+        addedCount++;
+        if(item.fromList && item.extraIndex >= 0){ extraItems[item.extraIndex].checked = true; markedCount++; }
+    });
+    save();
+    uploadSpecificData('stock', stock);
+    uploadSpecificData('itemPrices', itemPrices);
+    uploadSpecificData('extraItems', extraItems);
+    document.getElementById("scannerModal").style.display = "none";
+    resetReceiptZoom();
+    let msg = `✅ Compras registadas!\n\n📦 ${addedCount} itens → Despensa`;
+    if(markedCount > 0) msg += `\n✅ ${markedCount} marcados como comprados`;
+    alert(msg);
+    if(document.getElementById("stockTab").classList.contains("active")){ initStockFilters(); applyStockFilters(); }
+    if(document.getElementById("shopping").classList.contains("active")){ generateList(); renderExtraItems(); }
+}
+
 // ============ RECEITAS ============
 function toggleRecipeFavorite(name,event){event.stopPropagation();recipeFavorites[name]=!recipeFavorites[name];save();uploadSpecificData('recipeFavorites',recipeFavorites);renderRecipes();}
 function toggleRecipeHealthy(name,event){event.stopPropagation();recipeHealthy[name]=!recipeHealthy[name];save();uploadSpecificData('recipeHealthy',recipeHealthy);renderRecipes();}
@@ -637,14 +828,8 @@ function addExtraItem(){
     const qty = document.getElementById("extraItemQty").value.trim() || "1 un";
     const manualCat = document.getElementById("extraItemCategory").value;
     if(!name){alert("Escreve o nome do produto!");return;}
-    
-    // Se tem categoria manual, USA ESSA. Senão, detecta automaticamente
     const category = manualCat || categorizeFood(name);
-    
-    const existingIndex = extraItems.findIndex(item => 
-        item.name.toLowerCase() === name.toLowerCase() && !item.checked
-    );
-    
+    const existingIndex = extraItems.findIndex(item => item.name.toLowerCase() === name.toLowerCase() && !item.checked);
     if (existingIndex >= 0) {
         if (confirm(`"${name}" já está na lista. Atualizar quantidade para "${qty}"?`)) {
             extraItems[existingIndex].qty = qty;
@@ -682,11 +867,7 @@ function openEditExtraItem(index){
     document.getElementById("editExtraIndex").value = index;
     document.getElementById("editExtraItemModal").style.display = "flex";
 }
-function closeEditExtraItemModal(e){
-    if(!e || e.target === document.getElementById("editExtraItemModal")){
-        document.getElementById("editExtraItemModal").style.display = "none";
-    }
-}
+function closeEditExtraItemModal(e){if(!e||e.target===document.getElementById("editExtraItemModal")){document.getElementById("editExtraItemModal").style.display="none";}}
 function saveEditedExtraItem(){
     const index = parseInt(document.getElementById("editExtraIndex").value);
     extraItems[index].name = document.getElementById("editExtraName").value.trim();
@@ -725,36 +906,22 @@ function filterShoppingByMeal(){let day=document.getElementById("shoppingDayFilt
 function generateFilteredList(fd, fm){
     let list = new Map();
     let total = 0;
-    
-    // Processa todos os extraItems NÃO comprados
     extraItems.forEach((item, index) => {
         if (!item.checked) {
             const key = `${item.name} (${item.qty})`;
-            // Usa a categoria do item extra (manual ou automática)
             const cat = item.category || categorizeFood(item.name);
             if (!list.has(key)) {
-                list.set(key, {
-                    name: item.name,
-                    qty: item.qty,
-                    category: cat,
-                    extraIndex: index
-                });
+                list.set(key, { name: item.name, qty: item.qty, category: cat, extraIndex: index });
                 total++;
             }
         }
     });
-    
-    // Agrupa por categoria
     let groups = new Map();
     for (let [key, data] of list) {
         if (!groups.has(data.category)) groups.set(data.category, []);
         groups.get(data.category).push(data);
     }
-    
-    // Ordena categorias
     let sorted = getCategoryOrder().filter(c => groups.has(c));
-    
-    // Gera HTML
     let h = '';
     if (total === 0) {
         h = `<p style='text-align:center;padding:40px;background:var(--bg-card);border-radius:8px;'>✅ Nada a comprar!<br><small style="color:var(--text-secondary);">Use "Adicionar Produtos Extra" ou sincronize o planeador.</small></p>`;
@@ -784,48 +951,17 @@ function generateFilteredList(fd, fm){
         }
         h += `</div>`;
     }
-    
     document.getElementById("list").innerHTML = h;
     document.getElementById("totalItems").textContent = total;
     document.getElementById("estimatedTotal").textContent = "0,00 €";
     updateStats();
 }
-
-function updateStats(){
-    document.getElementById("checkedItems").textContent = extraItems.filter(i => i.checked).length;
-}
-
-function clearShoppingFilter(){
-    document.getElementById("shoppingDayFilter").value = '';
-    document.getElementById("shoppingMealFilter").value = '';
-    document.getElementById("shoppingFilterInfo").style.display = "none";
-}
-
-function generateList(){
-    // Atualiza a lista de compras diretamente
-    clearShoppingFilter();
-    generateFilteredList(null, null);
-}
-
-function toggleCheckItem(cb){
-    // Não usado diretamente, mas mantido para compatibilidade
-    cb.closest('tr').classList.toggle('checked-item', cb.checked);
-    updateStats();
-}
-
-function markAllChecked(){
-    extraItems.forEach(i => i.checked = true);
-    save();
-    renderExtraItems();
-    generateList();
-}
-
-function unmarkAllChecked(){
-    extraItems.forEach(i => i.checked = false);
-    save();
-    renderExtraItems();
-    generateList();
-}
+function updateStats(){document.getElementById("checkedItems").textContent = extraItems.filter(i => i.checked).length;}
+function clearShoppingFilter(){document.getElementById("shoppingDayFilter").value='';document.getElementById("shoppingMealFilter").value='';document.getElementById("shoppingFilterInfo").style.display="none";}
+function generateList(){clearShoppingFilter();generateFilteredList(null, null);}
+function toggleCheckItem(cb){cb.closest('tr').classList.toggle('checked-item',cb.checked);updateStats();}
+function markAllChecked(){extraItems.forEach(i => i.checked = true);save();renderExtraItems();generateList();}
+function unmarkAllChecked(){extraItems.forEach(i => i.checked = false);save();renderExtraItems();generateList();}
 
 // ============ DESPENSA ============
 function initStockFilters(){let cats=new Set();Object.keys(stock).forEach(i=>cats.add(categorizeFood(i)));let s=document.getElementById("stockCategoryFilter");s.innerHTML='<option value="">Todas</option>';getCategoryOrder().filter(c=>cats.has(c)).forEach(c=>s.innerHTML+=`<option>${c}</option>`);let d=document.getElementById("stockDayFilter");d.innerHTML='<option value="">Selecione</option>';let dn=currentLanguage==='pt'?days:daysEn;days.forEach((day,i)=>d.innerHTML+=`<option value="${day}">${dn[i]}</option>`);updateStockMealFilter();}
