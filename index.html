@@ -352,7 +352,7 @@ h3{color: var(--text-primary);font-weight:600;margin-bottom:20px;}
     <button onclick="addExtraItem()" class="btn-purple" style="height:42px;">➕ Adicionar</button>
 </div>
 <div id="extraItemsContainer" style="margin-top:12px;"></div></div>
-<div class="btn-group"><button onclick="generateList()" class="btn-success">🔄 Atualizar</button><button onclick="printShoppingList()" class="btn-success">🖨️ Imprimir</button><button onclick="exportShoppingListPDF()" class="btn-danger">📄 PDF</button><button onclick="exportShoppingListCSV()" class="btn-info">📊 CSV</button><button onclick="emailShoppingList()" class="btn-purple">📧 Enviar por Email</button><button onclick="markAllChecked()" class="btn-warning">✅ Marcar</button><button onclick="unmarkAllChecked()" class="btn-warning">⬜ Desmarcar</button><button onclick="addMissingToStock()" class="btn-purple">📦 Adicionar à Despensa</button></div>
+<div class="btn-group"><button onclick="generateList()" class="btn-success">🔄 Atualizar</button><button onclick="printShoppingList()" class="btn-success">🖨️ Imprimir</button><button onclick="finalizeShopping()" class="btn-purple">📦 Finalizar Compras</button><button onclick="exportShoppingListPDF()" class="btn-danger">📄 PDF</button><button onclick="exportShoppingListCSV()" class="btn-info">📊 CSV</button><button onclick="emailShoppingList()" class="btn-purple">📧 Enviar por Email</button><button onclick="markAllChecked()" class="btn-warning">✅ Marcar</button><button onclick="unmarkAllChecked()" class="btn-warning">⬜ Desmarcar</button><button onclick="addMissingToStock()" class="btn-purple">📦 Adicionar à Despensa</button></div>
 <div id="list"></div>
 </div>
 
@@ -514,19 +514,11 @@ function getBadgeClass(t){const c={'Prato Principal':'badge-primary','Sopa':'bad
 function getCategoryOrder(){
     let all = new Set(categoryOrder);
     Object.keys(stock).forEach(i => all.add(categorizeFood(i)));
-    extraItems.forEach(item => {
-        if(item.name) all.add(item.category || categorizeFood(item.name));
-    });
-    // Garante que TODAS as categorias estão presentes
+    extraItems.forEach(item => {if(item.name) all.add(item.category || categorizeFood(item.name));});
     allCategories.forEach(c => all.add(c));
-    // Retorna as categorias na ordem correta, incluindo as que têm itens
-    let result = categoryOrder.filter(c => all.has(c));
-    // Adiciona categorias que têm itens mas não estão na ordem padrão
-    for (let c of all) {
-        if (!result.includes(c)) result.push(c);
-    }
-    return result;
+    return categoryOrder.filter(c => all.has(c));
 }
+
 // ============ TEMAS ============
 function setSkin(skin){document.body.className='';if(skin)document.body.classList.add('skin-'+skin);if(currentTheme==='dark')document.body.classList.add('dark-theme');localStorage.setItem("skin",skin);currentSkin=skin;}
 function toggleTheme(){currentTheme=currentTheme==="light"?"dark":"light";localStorage.setItem("theme",currentTheme);applyTheme();}
@@ -652,6 +644,28 @@ function confirmSyncIngredients() {
 function closeSyncIngredientsModal(event) { if (!event || event.target === document.getElementById("syncIngredientsModal")) { document.getElementById("syncIngredientsModal").style.display = "none"; pendingSyncItems = []; } }
 
 // ============ SCANNER DE COMPRAS ============
+function finalizeShopping(){
+    const checkedItems = extraItems.filter(item => item.checked);
+    if (checkedItems.length === 0) {
+        alert("⚠️ Nenhum item marcado como comprado!\n\nMarque os itens que comprou usando os checkboxes ☑️ ao lado de cada produto.");
+        return;
+    }
+    pendingReceiptItems = checkedItems.map(item => ({
+        name: item.name, qty: item.qty, price: itemPrices[item.name] || 0,
+        selected: true, fromList: true, extraIndex: extraItems.indexOf(item)
+    }));
+    document.getElementById("receiptPreview").style.display = "none";
+    document.getElementById("receiptPlaceholder").style.display = "flex";
+    document.getElementById("receiptInput").value = "";
+    document.getElementById("scannerExtraName").value = "";
+    document.getElementById("scannerExtraQty").value = "";
+    document.getElementById("scannerExtraPrice").value = "";
+    receiptZoomLevel = 1;
+    resetReceiptZoom();
+    renderScannerItems();
+    document.getElementById("scannerModal").style.display = "flex";
+}
+
 function openScanner(){
     document.getElementById("receiptPreview").style.display = "none";
     document.getElementById("receiptPlaceholder").style.display = "block";
@@ -662,124 +676,41 @@ function openScanner(){
     pendingReceiptItems = [];
     receiptZoomLevel = 1;
     resetReceiptZoom();
-    
-    const itemsFromList = extraItems
-        .filter(item => !item.checked)
-        .map(item => ({
-            name: item.name,
-            qty: item.qty,
-            price: itemPrices[item.name] || 0,
-            selected: true,
-            fromList: true,
-            extraIndex: extraItems.indexOf(item)
-        }));
-    
+    const itemsFromList = extraItems.filter(item => !item.checked).map(item => ({
+        name: item.name, qty: item.qty, price: itemPrices[item.name] || 0,
+        selected: true, fromList: true, extraIndex: extraItems.indexOf(item)
+    }));
     pendingReceiptItems = itemsFromList;
     renderScannerItems();
     document.getElementById("scannerModal").style.display = "flex";
 }
 
-function closeScannerModal(e){
-    if(!e || e.target === document.getElementById("scannerModal")){
-        document.getElementById("scannerModal").style.display = "none";
-        resetReceiptZoom();
-    }
-}
-
-function showReceiptPhoto(event){
-    const file = event.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e){
-        document.getElementById("receiptPreview").src = e.target.result;
-        document.getElementById("receiptPreview").style.display = "block";
-        document.getElementById("receiptPlaceholder").style.display = "none";
-        resetReceiptZoom();
-    };
-    reader.readAsDataURL(file);
-}
-
-function clearReceiptPhoto(){
-    document.getElementById("receiptPreview").style.display = "none";
-    document.getElementById("receiptPlaceholder").style.display = "block";
-    document.getElementById("receiptInput").value = "";
-    resetReceiptZoom();
-}
-
-function toggleReceiptZoom(){
-    receiptZoomLevel >= 3 ? resetReceiptZoom() : (receiptZoomLevel += 0.5, applyReceiptZoom());
-}
-
-function zoomReceiptIn(){
-    if(receiptZoomLevel < 5){ receiptZoomLevel += 0.5; applyReceiptZoom(); }
-}
-
-function zoomReceiptOut(){
-    if(receiptZoomLevel > 0.5){ receiptZoomLevel -= 0.5; applyReceiptZoom(); }
-}
-
-function resetReceiptZoom(){
-    receiptZoomLevel = 1;
-    applyReceiptZoom();
-    document.getElementById("receiptPhotoContainer").style.overflow = "hidden";
-    document.getElementById("receiptPhotoContainer").style.cursor = "pointer";
-}
-
-function applyReceiptZoom(){
-    const img = document.getElementById("receiptPreview");
-    if(img.style.display !== "none"){
-        img.style.transform = `scale(${receiptZoomLevel})`;
-        img.style.transformOrigin = "top left";
-        document.getElementById("receiptPhotoContainer").style.overflow = receiptZoomLevel > 1 ? "auto" : "hidden";
-        document.getElementById("receiptPhotoContainer").style.cursor = receiptZoomLevel > 1 ? "zoom-out" : "zoom-in";
-    }
-}
-
-function addScannerExtraItem(){
-    const name = document.getElementById("scannerExtraName").value.trim();
-    const qty = document.getElementById("scannerExtraQty").value.trim() || "1 un";
-    const price = parseFloat(document.getElementById("scannerExtraPrice").value) || 0;
-    if(!name){ alert("Escreva o nome do item!"); return; }
-    pendingReceiptItems.push({ name, qty, price, selected: true, fromList: false, extraIndex: -1 });
-    document.getElementById("scannerExtraName").value = "";
-    document.getElementById("scannerExtraQty").value = "";
-    document.getElementById("scannerExtraPrice").value = "";
-    renderScannerItems();
-}
-
-function renderScannerItems(){
-    const container = document.getElementById("scannerItemsList");
-    if(pendingReceiptItems.length === 0){
-        container.innerHTML = '<p style="text-align:center;padding:15px;color:var(--text-secondary);">📋 Nenhum item na lista de compras.<br>Adicione itens extra ou vá à aba 🧾 Lista.</p>';
-        return;
-    }
-    let html = '';
-    pendingReceiptItems.forEach((item, index) => {
-        html += `<div class="sync-item-row" style="${item.fromList ? 'background:var(--filter-bg);' : 'background:#fff8e1;'}">
-            <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="pendingReceiptItems[${index}].selected = this.checked" style="width:16px;height:16px;">
-            <input type="text" value="${item.name}" onchange="pendingReceiptItems[${index}].name = this.value" style="flex:2;font-size:12px;">
-            <input type="text" value="${item.qty}" onchange="pendingReceiptItems[${index}].qty = this.value" style="width:80px;font-size:12px;">
-            <input type="number" value="${item.price}" step="0.01" onchange="pendingReceiptItems[${index}].price = parseFloat(this.value) || 0" style="width:70px;font-size:12px;">
-            <button onclick="pendingReceiptItems.splice(${index},1);renderScannerItems();" class="remove-btn">×</button>
-        </div>`;
-    });
-    container.innerHTML = html;
-}
-
-function selectAllScannerItems(){ pendingReceiptItems.forEach(i => i.selected = true); renderScannerItems(); }
-function deselectAllScannerItems(){ pendingReceiptItems.forEach(i => i.selected = false); renderScannerItems(); }
-
+function closeScannerModal(e){if(!e||e.target===document.getElementById("scannerModal")){document.getElementById("scannerModal").style.display="none";resetReceiptZoom();}}
+function showReceiptPhoto(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=function(e){document.getElementById("receiptPreview").src=e.target.result;document.getElementById("receiptPreview").style.display="block";document.getElementById("receiptPlaceholder").style.display="none";resetReceiptZoom();};reader.readAsDataURL(file);}
+function clearReceiptPhoto(){document.getElementById("receiptPreview").style.display="none";document.getElementById("receiptPlaceholder").style.display="block";document.getElementById("receiptInput").value="";resetReceiptZoom();}
+function toggleReceiptZoom(){receiptZoomLevel>=3?resetReceiptZoom():(receiptZoomLevel+=0.5,applyReceiptZoom());}
+function zoomReceiptIn(){if(receiptZoomLevel<5){receiptZoomLevel+=0.5;applyReceiptZoom();}}
+function zoomReceiptOut(){if(receiptZoomLevel>0.5){receiptZoomLevel-=0.5;applyReceiptZoom();}}
+function resetReceiptZoom(){receiptZoomLevel=1;applyReceiptZoom();document.getElementById("receiptPhotoContainer").style.overflow="hidden";document.getElementById("receiptPhotoContainer").style.cursor="pointer";}
+function applyReceiptZoom(){const img=document.getElementById("receiptPreview");if(img.style.display!=="none"){img.style.transform=`scale(${receiptZoomLevel})`;img.style.transformOrigin="top left";document.getElementById("receiptPhotoContainer").style.overflow=receiptZoomLevel>1?"auto":"hidden";document.getElementById("receiptPhotoContainer").style.cursor=receiptZoomLevel>1?"zoom-out":"zoom-in";}}
+function addScannerExtraItem(){const name=document.getElementById("scannerExtraName").value.trim();const qty=document.getElementById("scannerExtraQty").value.trim()||"1 un";const price=parseFloat(document.getElementById("scannerExtraPrice").value)||0;if(!name){alert("Escreva o nome!");return;}pendingReceiptItems.push({name,qty,price,selected:true,fromList:false,extraIndex:-1});document.getElementById("scannerExtraName").value="";document.getElementById("scannerExtraQty").value="";document.getElementById("scannerExtraPrice").value="";renderScannerItems();}
+function renderScannerItems(){const container=document.getElementById("scannerItemsList");if(pendingReceiptItems.length===0){container.innerHTML='<p style="text-align:center;padding:15px;">📋 Nenhum item.</p>';return;}let html='';pendingReceiptItems.forEach((item,index)=>{html+=`<div class="sync-item-row" style="${item.fromList?'background:var(--filter-bg);':'background:#fff8e1;'}"><input type="checkbox" ${item.selected?'checked':''} onchange="pendingReceiptItems[${index}].selected=this.checked"><input type="text" value="${item.name}" onchange="pendingReceiptItems[${index}].name=this.value" style="flex:2;font-size:12px;"><input type="text" value="${item.qty}" onchange="pendingReceiptItems[${index}].qty=this.value" style="width:80px;font-size:12px;"><input type="number" value="${item.price}" step="0.01" onchange="pendingReceiptItems[${index}].price=parseFloat(this.value)||0" style="width:70px;font-size:12px;"><button onclick="pendingReceiptItems.splice(${index},1);renderScannerItems();" class="remove-btn">×</button></div>`;});container.innerHTML=html;}
+function selectAllScannerItems(){pendingReceiptItems.forEach(i=>i.selected=true);renderScannerItems();}
+function deselectAllScannerItems(){pendingReceiptItems.forEach(i=>i.selected=false);renderScannerItems();}
 function confirmReceiptItems(){
     const selected = pendingReceiptItems.filter(i => i.selected);
     if(selected.length === 0){ alert("⚠️ Selecione pelo menos um item!"); return; }
-    let addedCount = 0, markedCount = 0;
+    let addedCount = 0, removedCount = 0;
     selected.forEach(item => {
         const key = `${item.name} (${item.qty})`;
         const ek = Object.keys(stock).find(k => k.toLowerCase().includes(item.name.toLowerCase()));
         if(ek){ stock[ek] = (stock[ek] || 0) + 1; } else { stock[key] = 1; }
         if(item.price > 0) itemPrices[key] = item.price;
         addedCount++;
-        if(item.fromList && item.extraIndex >= 0){ extraItems[item.extraIndex].checked = true; markedCount++; }
+        if(item.fromList && item.extraIndex >= 0){
+            extraItems.splice(item.extraIndex, 1);
+            removedCount++;
+        }
     });
     save();
     uploadSpecificData('stock', stock);
@@ -787,8 +718,8 @@ function confirmReceiptItems(){
     uploadSpecificData('extraItems', extraItems);
     document.getElementById("scannerModal").style.display = "none";
     resetReceiptZoom();
-    let msg = `✅ Compras registadas!\n\n📦 ${addedCount} itens → Despensa`;
-    if(markedCount > 0) msg += `\n✅ ${markedCount} marcados como comprados`;
+    let msg = `✅ Compras finalizadas!\n\n📦 ${addedCount} itens → Despensa`;
+    if(removedCount > 0) msg += `\n🗑️ ${removedCount} itens removidos da lista`;
     alert(msg);
     if(document.getElementById("stockTab").classList.contains("active")){ initStockFilters(); applyStockFilters(); }
     if(document.getElementById("shopping").classList.contains("active")){ generateList(); renderExtraItems(); }
@@ -859,25 +790,9 @@ function renderExtraItems(){
     if(extraItems.some(i=>i.checked))h+=`<button onclick="clearCheckedExtraItems()" class="btn-warning btn-small">🗑️ Limpar comprados</button>`;
     h+=`</div>`;c.innerHTML=h;
 }
-function openEditExtraItem(index){
-    const item = extraItems[index];
-    document.getElementById("editExtraName").value = item.name;
-    document.getElementById("editExtraQty").value = item.qty;
-    document.getElementById("editExtraCategory").value = item.category || '';
-    document.getElementById("editExtraIndex").value = index;
-    document.getElementById("editExtraItemModal").style.display = "flex";
-}
+function openEditExtraItem(index){const item=extraItems[index];document.getElementById("editExtraName").value=item.name;document.getElementById("editExtraQty").value=item.qty;document.getElementById("editExtraCategory").value=item.category||'';document.getElementById("editExtraIndex").value=index;document.getElementById("editExtraItemModal").style.display="flex";}
 function closeEditExtraItemModal(e){if(!e||e.target===document.getElementById("editExtraItemModal")){document.getElementById("editExtraItemModal").style.display="none";}}
-function saveEditedExtraItem(){
-    const index = parseInt(document.getElementById("editExtraIndex").value);
-    extraItems[index].name = document.getElementById("editExtraName").value.trim();
-    extraItems[index].qty = document.getElementById("editExtraQty").value.trim() || "1 un";
-    extraItems[index].category = document.getElementById("editExtraCategory").value || categorizeFood(extraItems[index].name);
-    save();
-    document.getElementById("editExtraItemModal").style.display = "none";
-    renderExtraItems();
-    generateList();
-}
+function saveEditedExtraItem(){const index=parseInt(document.getElementById("editExtraIndex").value);extraItems[index].name=document.getElementById("editExtraName").value.trim();extraItems[index].qty=document.getElementById("editExtraQty").value.trim()||"1 un";extraItems[index].category=document.getElementById("editExtraCategory").value||categorizeFood(extraItems[index].name);save();document.getElementById("editExtraItemModal").style.display="none";renderExtraItems();generateList();}
 function toggleExtraItem(index){extraItems[index].checked=!extraItems[index].checked;save();uploadSpecificData('extraItems',extraItems);renderExtraItems();generateList();}
 function removeExtraItem(index){extraItems.splice(index,1);save();uploadSpecificData('extraItems',extraItems);renderExtraItems();generateList();}
 function removeExtraItemFromList(index){if(confirm("Remover este item da lista?")){extraItems.splice(index,1);save();uploadSpecificData('extraItems',extraItems);renderExtraItems();generateList();}}
@@ -906,29 +821,16 @@ function filterShoppingByMeal(){let day=document.getElementById("shoppingDayFilt
 function generateFilteredList(fd, fm){
     let groups = new Map();
     let total = 0;
-    
-    // Percorre todos os extraItems NÃO comprados
     extraItems.forEach((item, index) => {
         if (!item.checked) {
             const cat = item.category || categorizeFood(item.name);
             if (!groups.has(cat)) groups.set(cat, []);
-            groups.get(cat).push({
-                name: item.name,
-                qty: item.qty,
-                category: cat,
-                extraIndex: index
-            });
+            groups.get(cat).push({name: item.name, qty: item.qty, category: cat, extraIndex: index});
             total++;
         }
     });
-    
-    // Ordena categorias - garante que todas aparecem
     let sorted = allCategories.filter(c => groups.has(c));
-    // Adiciona categorias que possam não estar na lista padrão
-    for (let c of groups.keys()) {
-        if (!sorted.includes(c)) sorted.push(c);
-    }
-    
+    for (let c of groups.keys()) {if (!sorted.includes(c)) sorted.push(c);}
     let h = '';
     if (total === 0) {
         h = `<p style='text-align:center;padding:40px;background:var(--bg-card);border-radius:8px;'>✅ Nada a comprar!<br><small style="color:var(--text-secondary);">Use "Adicionar Produtos Extra" ou sincronize o planeador.</small></p>`;
@@ -941,7 +843,6 @@ function generateFilteredList(fd, fm){
                 <table class="shopping-table">
                     <thead><tr><th style="width:40px;"></th><th>Produto</th><th style="width:100px;">Qtd</th><th style="width:80px;"></th></tr></thead>
                     <tbody>`;
-            
             items.forEach(data => {
                 h += `<tr style="background:var(--filter-bg);">
                     <td><input type="checkbox" onchange="toggleExtraItem(${data.extraIndex})"></td>
@@ -953,12 +854,10 @@ function generateFilteredList(fd, fm){
                     </td>
                 </tr>`;
             });
-            
             h += `</tbody></table></div>`;
         }
         h += `</div>`;
     }
-    
     document.getElementById("list").innerHTML = h;
     document.getElementById("totalItems").textContent = total;
     document.getElementById("estimatedTotal").textContent = "0,00 €";
