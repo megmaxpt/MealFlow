@@ -224,6 +224,24 @@ h3{color: var(--text-primary);font-weight:600;margin-bottom:20px;}
 
 <div id="syncIngredientsModal" class="sync-modal" style="display:none;" onclick="closeSyncIngredientsModal(event)"><div class="sync-modal-content" onclick="event.stopPropagation()"><h3 style="margin:0 0 15px 0;">📋 Sincronização de Ingredientes</h3><p style="margin-bottom:15px;color:var(--text-secondary);">Foram encontrados <strong id="syncIngredientCount">0</strong> ingredientes do planeador.</p><div style="display:flex;gap:10px;margin-bottom:15px;"><button onclick="selectAllSyncItems()" class="btn-small btn-info">☑️ Selecionar Todos</button><button onclick="deselectAllSyncItems()" class="btn-small btn-warning">☐ Desselecionar Todos</button></div><div id="syncIngredientsList" style="max-height:50vh;overflow-y:auto;margin-bottom:15px;"></div><div style="display:flex;gap:10px;justify-content:flex-end;"><button onclick="confirmSyncIngredients()" class="btn btn-success">✅ Adicionar Selecionados</button><button onclick="closeSyncIngredientsModal()" class="btn btn-outline">❌ Cancelar</button></div></div></div>
 
+<!-- Edit Extra Item Modal -->
+<div id="editExtraItemModal" class="sync-modal" style="display:none;" onclick="closeEditExtraItemModal(event)"><div class="sync-modal-content" onclick="event.stopPropagation()"><h3 style="margin:0 0 15px 0;">✏️ Editar Produto</h3>
+<div style="margin-bottom:10px;"><label style="font-size:12px;">Nome</label><input type="text" id="editExtraName"></div>
+<div style="margin-bottom:10px;"><label style="font-size:12px;">Quantidade</label><input type="text" id="editExtraQty"></div>
+<div style="margin-bottom:10px;"><label style="font-size:12px;">Categoria</label>
+    <select id="editExtraCategory">
+        <option value="🧂 Mercearia">🧂 Mercearia</option><option value="🥛 Laticínios e Ovos">🥛 Laticínios e Ovos</option>
+        <option value="🍎 Frutas">🍎 Frutas</option><option value="🥦 Legumes e Vegetais">🥦 Legumes e Vegetais</option>
+        <option value="🥩 Carnes">🥩 Carnes</option><option value="🐟 Peixes e Marisco">🐟 Peixes e Marisco</option>
+        <option value="🍚 Grãos e Massas">🍚 Grãos e Massas</option><option value="🧂 Temperos e Ervas">🧂 Temperos e Ervas</option>
+        <option value="🥫 Enlatados e Conservas">🥫 Enlatados e Conservas</option><option value="🍷 Bebidas">🍷 Bebidas</option>
+        <option value="🍰 Sobremesas">🍰 Sobremesas</option><option value="🧹 Limpeza">🧹 Limpeza</option>
+        <option value="🧴 Higiene">🧴 Higiene</option><option value="📦 Outros">📦 Outros</option>
+    </select>
+</div>
+<input type="hidden" id="editExtraIndex">
+<div style="display:flex;gap:10px;margin-top:15px;"><button onclick="saveEditedExtraItem()" class="btn btn-success" style="flex:1;">💾 Guardar</button><button onclick="closeEditExtraItemModal()" class="btn btn-outline">❌ Cancelar</button></div></div></div>
+
 <div id="recipes" class="container active">
 <div class="recipes-header"><h2 style="margin:0;">📚 As Minhas Receitas</h2><div class="recipes-stats"><div class="stat-badge">📋 Total: <span id="totalRecipes">0</span></div><div class="stat-badge">🍽️ Pratos: <span id="mainDishes">0</span></div><div class="stat-badge">🥗 Saudáveis: <span id="healthyRecipes">0</span></div><div class="stat-badge">⭐ Favoritos: <span id="favRecipes">0</span></div></div></div>
 <div style="display:flex;gap:15px;align-items:center;flex-wrap:wrap;"><input id="search" placeholder="🔍 Pesquisar..." oninput="renderRecipes()" style="flex:1;min-width:200px;"><select id="catFilter" onchange="renderRecipes()" style="width:auto;"><option value="">📂 Todas</option></select><select id="sortBy" onchange="renderRecipes()" style="width:auto;"><option value="name">🔤 Nome</option><option value="category">📁 Categoria</option><option value="type">🍽️ Tipo</option></select></div>
@@ -338,7 +356,8 @@ let extraItems = JSON.parse(localStorage.getItem("extraItems")) || [];
 let recipeHealthy = JSON.parse(localStorage.getItem("recipeHealthy")) || {};
 let pendingSyncItems = [];
 
-const defaultCategoryOrder = ["🥩 Carnes","🐟 Peixes e Marisco","🥦 Legumes e Vegetais","🍎 Frutas","🥛 Laticínios e Ovos","🍚 Grãos e Massas","🧂 Temperos e Ervas","🥫 Enlatados e Conservas","🍷 Bebidas","🍰 Sobremesas","🧹 Limpeza","🧴 Higiene","📦 Outros","🧂 Mercearia"];
+const allCategories = ["🥩 Carnes","🐟 Peixes e Marisco","🥦 Legumes e Vegetais","🍎 Frutas","🥛 Laticínios e Ovos","🍚 Grãos e Massas","🧂 Temperos e Ervas","🥫 Enlatados e Conservas","🍷 Bebidas","🍰 Sobremesas","🧹 Limpeza","🧴 Higiene","📦 Outros","🧂 Mercearia"];
+const defaultCategoryOrder = [...allCategories];
 let categoryOrder = JSON.parse(localStorage.getItem("categoryOrder")) || [...defaultCategoryOrder];
 const defaultTabOrder = ["recipes","manage","data","planner","shopping","stockTab","notes","settings"];
 let tabOrder = JSON.parse(localStorage.getItem("tabOrder")) || [...defaultTabOrder];
@@ -423,22 +442,18 @@ function extractIngredientName(i) {
 }
 function extractQuantityWithUnit(i){if(/q\.?\s*b\.?\s*\.?|quanto\s+baste|qb/i.test(i))return{value:0,unit:'q.b.',text:"q.b.",type:'qb'};let m=i.match(/(\d+[.,]?\d*)\s*([a-zA-ZÀ-ÿ]+)?/i);if(m)return{value:parseFloat(m[1].replace(',','.')),unit:m[2]||null,type:'quantity'};return{value:1,unit:'un',type:'count'};}
 function categorizeFood(i, manualCat=''){
-    // Se tem categoria manual, usa essa (SOBREPÕE a automática)
     if(manualCat && allCategories.includes(manualCat)) return manualCat;
-    
     let n = i.toLowerCase();
     if(n.includes('frango')||n.includes('carne')||n.includes('porco')||n.includes('vaca'))return'🥩 Carnes';
     if(n.includes('bacalhau')||n.includes('peixe')||n.includes('atum')||n.includes('salmão')||n.includes('camarão'))return'🐟 Peixes e Marisco';
     if(n.includes('batata')||n.includes('cebola')||n.includes('tomate')||n.includes('cenoura'))return'🥦 Legumes e Vegetais';
     if(n.includes('maçã')||n.includes('banana')||n.includes('laranja')||n.includes('limão'))return'🍎 Frutas';
     if(n.includes('leite')||n.includes('queijo')||n.includes('iogurte')||n.includes('ovo'))return'🥛 Laticínios e Ovos';
-    if(n.includes('arroz')||n.includes('massa')||n.includes('farinha')||n.includes('pão'))return'🍚 Grãos e Massas';
+    if(n.includes('arroz')||n.includes('massa')||n.includes('farinha'))return'🍚 Grãos e Massas';
     if(n.includes('sal')||n.includes('azeite')||n.includes('vinagre')||n.includes('óleo'))return'🧂 Temperos e Ervas';
-    // CORREÇÃO: Cogumelos, enlatados, conservas
     if(n.includes('cogumelo')||n.includes('enlatado')||n.includes('lata')||n.includes('conserva'))return'🥫 Enlatados e Conservas';
-    if(n.includes('atum')||n.includes('salsicha')||n.includes('milho')||n.includes('ervilha'))return'🥫 Enlatados e Conservas';
+    if(n.includes('salsicha')||n.includes('milho')||n.includes('ervilha'))return'🥫 Enlatados e Conservas';
     if(n.includes('chocolate')||n.includes('bolo')||n.includes('açúcar')||n.includes('sobremesa'))return'🍰 Sobremesas';
-    // CORREÇÃO: Detergentes, limpeza - mais palavras-chave
     if(n.includes('detergente')||n.includes('lixívia')||n.includes('esfregão')||n.includes('limpa')||n.includes('chão')||n.includes('mosaico')||n.includes('madeira'))return'🧹 Limpeza';
     if(n.includes('shampoo')||n.includes('sabonete')||n.includes('papel')||n.includes('higiénico'))return'🧴 Higiene';
     if(n.includes('vinho')||n.includes('cerveja')||n.includes('água')||n.includes('sumo'))return'🍷 Bebidas';
@@ -448,7 +463,21 @@ function categorizeFood(i, manualCat=''){
 }
 function formatQuantity(v,u){if(!u)return v.toString();if(u==='q.b.')return'q.b.';return`${Math.ceil(v)} ${u}`;}
 function getBadgeClass(t){const c={'Prato Principal':'badge-primary','Sopa':'badge-sopa','Entrada':'badge-entrada','Sobremesa':'badge-sobremesa','Saudável':'badge-saudavel'};return c[t]||'badge-primary';}
-function getCategoryOrder(){let all=new Set(categoryOrder);Object.keys(stock).forEach(i=>all.add(categorizeFood(i)));Object.values(recipes).forEach(r=>{if(r.ing)r.ing.forEach(i=>{let n=extractIngredientName(i);if(n)all.add(categorizeFood(n));});});return categoryOrder.filter(c=>all.has(c));}
+function getCategoryOrder(){
+    let all = new Set(categoryOrder);
+    Object.keys(stock).forEach(i => all.add(categorizeFood(i)));
+    Object.values(recipes).forEach(r => {
+        if(r.ing) r.ing.forEach(i => {
+            let n = extractIngredientName(i);
+            if(n) all.add(categorizeFood(n));
+        });
+    });
+    extraItems.forEach(item => {
+        if(item.name) all.add(item.category || categorizeFood(item.name));
+    });
+    allCategories.forEach(c => all.add(c));
+    return categoryOrder.filter(c => all.has(c));
+}
 
 // ============ TEMAS ============
 function setSkin(skin){document.body.className='';if(skin)document.body.classList.add('skin-'+skin);if(currentTheme==='dark')document.body.classList.add('dark-theme');localStorage.setItem("skin",skin);currentSkin=skin;}
@@ -606,10 +635,12 @@ function deleteRecipe(n){if(confirm(`Apagar "${n}"?`)){delete recipes[n];delete 
 function addExtraItem(){
     const name = document.getElementById("extraItemName").value.trim();
     const qty = document.getElementById("extraItemQty").value.trim() || "1 un";
-    const category = document.getElementById("extraItemCategory").value;
+    const manualCat = document.getElementById("extraItemCategory").value;
     if(!name){alert("Escreve o nome do produto!");return;}
     
-    // Verifica se já existe um item extra com o mesmo nome
+    // Se tem categoria manual, USA ESSA. Senão, detecta automaticamente
+    const category = manualCat || categorizeFood(name);
+    
     const existingIndex = extraItems.findIndex(item => 
         item.name.toLowerCase() === name.toLowerCase() && !item.checked
     );
@@ -617,16 +648,55 @@ function addExtraItem(){
     if (existingIndex >= 0) {
         if (confirm(`"${name}" já está na lista. Atualizar quantidade para "${qty}"?`)) {
             extraItems[existingIndex].qty = qty;
-            extraItems[existingIndex].category = category || categorizeFood(name);
+            extraItems[existingIndex].category = category;
         } else { return; }
     } else {
-        extraItems.push({name,qty,category:category||categorizeFood(name),checked:false,date:new Date().toISOString()});
+        extraItems.push({name, qty, category, checked:false, date:new Date().toISOString()});
     }
     save();uploadSpecificData('extraItems',extraItems);
     document.getElementById("extraItemName").value="";document.getElementById("extraItemQty").value="";document.getElementById("extraItemCategory").value="";
     renderExtraItems();generateList();
 }
-function renderExtraItems(){const c=document.getElementById("extraItemsContainer");if(extraItems.length===0){c.innerHTML='<p style="text-align:center;padding:10px;color:var(--text-secondary);font-size:13px;">Nenhum item extra</p>';return;}const u=extraItems.filter(i=>!i.checked);let h=`<div style="display:flex;flex-wrap:wrap;gap:6px;">`;extraItems.forEach((item,index)=>{h+=`<div class="extra-item-chip" style="${item.checked?'opacity:0.5;':''}"><input type="checkbox" ${item.checked?'checked':''} onchange="toggleExtraItem(${index})" style="width:16px;height:16px;margin:0;cursor:pointer;"><span style="${item.checked?'text-decoration:line-through;':''}">${item.name} (${item.qty})</span><button onclick="removeExtraItem(${index})" class="remove-btn">×</button></div>`;});h+=`</div><div style="margin-top:8px;"><span style="font-size:12px;">Total: ${extraItems.length} | Por comprar: ${u.length}</span>`;if(extraItems.some(i=>i.checked))h+=`<button onclick="clearCheckedExtraItems()" class="btn-warning btn-small">🗑️ Limpar comprados</button>`;h+=`</div>`;c.innerHTML=h;}
+function renderExtraItems(){
+    const c=document.getElementById("extraItemsContainer");
+    if(extraItems.length===0){c.innerHTML='<p style="text-align:center;padding:10px;color:var(--text-secondary);font-size:13px;">Nenhum item extra</p>';return;}
+    const u=extraItems.filter(i=>!i.checked);
+    let h=`<div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+    extraItems.forEach((item,index)=>{
+        h+=`<div class="extra-item-chip" style="${item.checked?'opacity:0.5;':''}">
+            <input type="checkbox" ${item.checked?'checked':''} onchange="toggleExtraItem(${index})" style="width:16px;height:16px;margin:0;cursor:pointer;">
+            <span style="${item.checked?'text-decoration:line-through;':''}">${item.name} (${item.qty}) <small style="color:var(--accent);">${item.category||''}</small></span>
+            <button onclick="openEditExtraItem(${index})" class="btn-small btn-info" style="padding:2px 6px;font-size:10px;" title="Editar">✏️</button>
+            <button onclick="removeExtraItem(${index})" class="remove-btn" title="Remover">×</button>
+        </div>`;
+    });
+    h+=`</div><div style="margin-top:8px;"><span style="font-size:12px;">Total: ${extraItems.length} | Por comprar: ${u.length}</span>`;
+    if(extraItems.some(i=>i.checked))h+=`<button onclick="clearCheckedExtraItems()" class="btn-warning btn-small">🗑️ Limpar comprados</button>`;
+    h+=`</div>`;c.innerHTML=h;
+}
+function openEditExtraItem(index){
+    const item = extraItems[index];
+    document.getElementById("editExtraName").value = item.name;
+    document.getElementById("editExtraQty").value = item.qty;
+    document.getElementById("editExtraCategory").value = item.category || '';
+    document.getElementById("editExtraIndex").value = index;
+    document.getElementById("editExtraItemModal").style.display = "flex";
+}
+function closeEditExtraItemModal(e){
+    if(!e || e.target === document.getElementById("editExtraItemModal")){
+        document.getElementById("editExtraItemModal").style.display = "none";
+    }
+}
+function saveEditedExtraItem(){
+    const index = parseInt(document.getElementById("editExtraIndex").value);
+    extraItems[index].name = document.getElementById("editExtraName").value.trim();
+    extraItems[index].qty = document.getElementById("editExtraQty").value.trim() || "1 un";
+    extraItems[index].category = document.getElementById("editExtraCategory").value || categorizeFood(extraItems[index].name);
+    save();
+    document.getElementById("editExtraItemModal").style.display = "none";
+    renderExtraItems();
+    generateList();
+}
 function toggleExtraItem(index){extraItems[index].checked=!extraItems[index].checked;save();uploadSpecificData('extraItems',extraItems);renderExtraItems();generateList();}
 function removeExtraItem(index){extraItems.splice(index,1);save();uploadSpecificData('extraItems',extraItems);renderExtraItems();generateList();}
 function removeExtraItemFromList(index){if(confirm("Remover este item da lista?")){extraItems.splice(index,1);save();uploadSpecificData('extraItems',extraItems);renderExtraItems();generateList();}}
@@ -651,51 +721,31 @@ function clearPlan(){if(confirm("Limpar?")){plan={};save();renderPlanner();}}
 // ============ LISTA DE COMPRAS ============
 function initShoppingFilters(){let d=document.getElementById("shoppingDayFilter");d.innerHTML='<option value="">Todos</option>';let dn=currentLanguage==='pt'?days:daysEn;days.forEach((day,i)=>d.innerHTML+=`<option value="${day}">${dn[i]}</option>`);let m=document.getElementById("shoppingMealFilter");m.innerHTML='<option value="">Todas</option>';mealTypes.forEach(t=>m.innerHTML+=`<option value="${t}">${mealTypeLabels[t]}</option>`);}
 function updateShoppingMealFilter(){filterShoppingByMeal();}
-function filterShoppingByMeal(){let day=document.getElementById("shoppingDayFilter").value,meal=document.getElementById("shoppingMealFilter").value;if(day&&meal){let rn=plan[`${day}_${meal}`],en=meal==='almoço'||meal==='jantar'||plan[`${day}_${meal}_enabled`]!==false;if(rn&&en){document.getElementById("shoppingFilterInfo").innerHTML=`<b>🍽️ ${day} - ${mealTypeLabels[meal]} (${rn})</b>`;document.getElementById("shoppingFilterInfo").style.display="block";generateFilteredList(day,meal);}else{document.getElementById("shoppingFilterInfo").innerHTML=`<b>⚠️ Nenhuma receita</b>`;document.getElementById("shoppingFilterInfo").style.display="block";generateFilteredList(null,null);}}else{document.getElementById("shoppingFilterInfo").style.display="none";generateFilteredList(null,null);}}
+function filterShoppingByMeal(){let day=document.getElementById("shoppingDayFilter").value,meal=document.getElementById("shoppingMealFilter").value;if(day&&meal){let rn=plan[`${day}_${meal}`],en=meal==='almoço'||meal==='jantar'||plan[`${day}_${meal}_enabled`]!==false;if(rn&&en){document.getElementById("shoppingFilterInfo").innerHTML=`<b>🍽️ ${day} - ${mealTypeLabels[meal]} (${rn})</b>`;document.getElementById("shoppingFilterInfo").style.display="block";}else{document.getElementById("shoppingFilterInfo").innerHTML=`<b>⚠️ Nenhuma receita</b>`;document.getElementById("shoppingFilterInfo").style.display="block";}}else{document.getElementById("shoppingFilterInfo").style.display="none";}generateList();}
 function generateFilteredList(fd,fm){
-    // Esta função agora só gera a lista a partir dos extraItems
-    // Os ingredientes das receitas são geridos através do modal de sincronização
     let list = new Map();
     let total = 0, totalEst = 0;
     
-    // Apenas itens extra (adicionados manualmente ou via sincronização)
     extraItems.forEach((item, index) => {
         if (!item.checked) {
             const key = `${item.name} (${item.qty})`;
             list.set(key, {
-                needed: 1, 
-                unit: 'un', 
-                baseName: item.name, 
-                displayText: item.qty, 
-                isExtra: true, 
-                extraIndex: index
+                needed: 1, unit: 'un', baseName: item.name, 
+                displayText: item.qty, isExtra: true, extraIndex: index
             });
             total++;
         }
     });
     
-    // Se houver filtro de dia/refeição, mantém essa funcionalidade
-    if (fd && fm) {
-        // Filtra apenas itens da receita específica
-        const recipeName = plan[`${fd}_${fm}`];
-        if (recipeName) {
-            const enabled = fm === 'almoço' || fm === 'jantar' || plan[`${fd}_${fm}_enabled`] !== false;
-            if (enabled) {
-                document.getElementById("shoppingFilterInfo").innerHTML = `<b>🍽️ ${fd} - ${mealTypeLabels[fm]} (${recipeName})</b>`;
-                document.getElementById("shoppingFilterInfo").style.display = "block";
-            }
-        }
-    }
-    
     let groups = new Map();
     for (let [i, d] of list) {
-        let c = categorizeFood(d.baseName);
+        // Usa a categoria do item extra (que já foi definida manualmente ou automaticamente)
+        const extraItem = extraItems[d.extraIndex];
+        const c = extraItem ? extraItem.category : categorizeFood(d.baseName);
         if (!groups.has(c)) groups.set(c, []);
         groups.get(c).push({
-            item: i, 
-            displayText: d.displayText, 
-            isExtra: d.isExtra, 
-            extraIndex: d.extraIndex
+            item: i, displayText: d.displayText, 
+            isExtra: d.isExtra, extraIndex: d.extraIndex
         });
     }
     
@@ -737,8 +787,9 @@ function generateFilteredList(fd,fm){
     document.getElementById("totalItems").textContent = total;
     document.getElementById("estimatedTotal").textContent = totalEst.toFixed(2) + ' €';
     updateStats();
-}function updateStats(){document.getElementById("checkedItems").textContent=document.querySelectorAll('#list input[type="checkbox"]:checked').length;}
-function clearShoppingFilter(){document.getElementById("shoppingDayFilter").value='';document.getElementById("shoppingMealFilter").value='';document.getElementById("shoppingFilterInfo").style.display="none";generateFilteredList(null,null);}
+}
+function updateStats(){document.getElementById("checkedItems").textContent=document.querySelectorAll('#list input[type="checkbox"]:checked').length;}
+function clearShoppingFilter(){document.getElementById("shoppingDayFilter").value='';document.getElementById("shoppingMealFilter").value='';document.getElementById("shoppingFilterInfo").style.display="none";generateList();}
 function generateList(){clearShoppingFilter();}
 function toggleCheckItem(cb){cb.closest('tr').classList.toggle('checked-item',cb.checked);updateStats();}
 function markAllChecked(){document.querySelectorAll('#list input[type="checkbox"]').forEach(cb=>{cb.checked=true;cb.closest('tr')?.classList.add('checked-item');});updateStats();}
