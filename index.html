@@ -514,19 +514,19 @@ function getBadgeClass(t){const c={'Prato Principal':'badge-primary','Sopa':'bad
 function getCategoryOrder(){
     let all = new Set(categoryOrder);
     Object.keys(stock).forEach(i => all.add(categorizeFood(i)));
-    Object.values(recipes).forEach(r => {
-        if(r.ing) r.ing.forEach(i => {
-            let n = extractIngredientName(i);
-            if(n) all.add(categorizeFood(n));
-        });
-    });
     extraItems.forEach(item => {
         if(item.name) all.add(item.category || categorizeFood(item.name));
     });
+    // Garante que TODAS as categorias estão presentes
     allCategories.forEach(c => all.add(c));
-    return categoryOrder.filter(c => all.has(c));
+    // Retorna as categorias na ordem correta, incluindo as que têm itens
+    let result = categoryOrder.filter(c => all.has(c));
+    // Adiciona categorias que têm itens mas não estão na ordem padrão
+    for (let c of all) {
+        if (!result.includes(c)) result.push(c);
+    }
+    return result;
 }
-
 // ============ TEMAS ============
 function setSkin(skin){document.body.className='';if(skin)document.body.classList.add('skin-'+skin);if(currentTheme==='dark')document.body.classList.add('dark-theme');localStorage.setItem("skin",skin);currentSkin=skin;}
 function toggleTheme(){currentTheme=currentTheme==="light"?"dark":"light";localStorage.setItem("theme",currentTheme);applyTheme();}
@@ -904,24 +904,31 @@ function initShoppingFilters(){let d=document.getElementById("shoppingDayFilter"
 function updateShoppingMealFilter(){filterShoppingByMeal();}
 function filterShoppingByMeal(){let day=document.getElementById("shoppingDayFilter").value,meal=document.getElementById("shoppingMealFilter").value;if(day&&meal){let rn=plan[`${day}_${meal}`],en=meal==='almoço'||meal==='jantar'||plan[`${day}_${meal}_enabled`]!==false;if(rn&&en){document.getElementById("shoppingFilterInfo").innerHTML=`<b>🍽️ ${day} - ${mealTypeLabels[meal]} (${rn})</b>`;document.getElementById("shoppingFilterInfo").style.display="block";}else{document.getElementById("shoppingFilterInfo").innerHTML=`<b>⚠️ Nenhuma receita</b>`;document.getElementById("shoppingFilterInfo").style.display="block";}}else{document.getElementById("shoppingFilterInfo").style.display="none";}generateList();}
 function generateFilteredList(fd, fm){
-    let list = new Map();
+    let groups = new Map();
     let total = 0;
+    
+    // Percorre todos os extraItems NÃO comprados
     extraItems.forEach((item, index) => {
         if (!item.checked) {
-            const key = `${item.name} (${item.qty})`;
             const cat = item.category || categorizeFood(item.name);
-            if (!list.has(key)) {
-                list.set(key, { name: item.name, qty: item.qty, category: cat, extraIndex: index });
-                total++;
-            }
+            if (!groups.has(cat)) groups.set(cat, []);
+            groups.get(cat).push({
+                name: item.name,
+                qty: item.qty,
+                category: cat,
+                extraIndex: index
+            });
+            total++;
         }
     });
-    let groups = new Map();
-    for (let [key, data] of list) {
-        if (!groups.has(data.category)) groups.set(data.category, []);
-        groups.get(data.category).push(data);
+    
+    // Ordena categorias - garante que todas aparecem
+    let sorted = allCategories.filter(c => groups.has(c));
+    // Adiciona categorias que possam não estar na lista padrão
+    for (let c of groups.keys()) {
+        if (!sorted.includes(c)) sorted.push(c);
     }
-    let sorted = getCategoryOrder().filter(c => groups.has(c));
+    
     let h = '';
     if (total === 0) {
         h = `<p style='text-align:center;padding:40px;background:var(--bg-card);border-radius:8px;'>✅ Nada a comprar!<br><small style="color:var(--text-secondary);">Use "Adicionar Produtos Extra" ou sincronize o planeador.</small></p>`;
@@ -930,7 +937,7 @@ function generateFilteredList(fd, fm){
         for (let c of sorted) {
             let items = groups.get(c).sort((a, b) => a.name.localeCompare(b.name));
             h += `<div style="background:var(--bg-card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);">
-                <h3 style="margin:0;padding:14px 18px;background:var(--section-bg);border-bottom:3px solid var(--accent);">${c}</h3>
+                <h3 style="margin:0;padding:14px 18px;background:var(--section-bg);border-bottom:3px solid var(--accent);">${c} (${items.length})</h3>
                 <table class="shopping-table">
                     <thead><tr><th style="width:40px;"></th><th>Produto</th><th style="width:100px;">Qtd</th><th style="width:80px;"></th></tr></thead>
                     <tbody>`;
@@ -951,6 +958,7 @@ function generateFilteredList(fd, fm){
         }
         h += `</div>`;
     }
+    
     document.getElementById("list").innerHTML = h;
     document.getElementById("totalItems").textContent = total;
     document.getElementById("estimatedTotal").textContent = "0,00 €";
